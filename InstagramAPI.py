@@ -14,6 +14,12 @@ from ImageUtils import getImageSize
 from requests_toolbelt import MultipartEncoder
 from moviepy.editor import VideoFileClip
 
+from logging import getLogger
+from logging import config
+from settings import LOGGING_SETTINGS
+
+config.dictConfig(LOGGING_SETTINGS)
+logger = getLogger(__name__)
 
 class InstagramAPI:
     API_URL = 'https://i.instagram.com/api/v1/'
@@ -80,8 +86,8 @@ class InstagramAPI:
                     self.timelineFeed()
                     self.getv2Inbox()
                     self.getRecentActivity()
-                    print ("Login success!\n")
-                    return True;
+                    logger.info("Login success")
+                    return True
 
     def syncFeatures(self):
         data = json.dumps({
@@ -601,7 +607,7 @@ class InstagramAPI:
     def SendRequest(self, endpoint, post=None, login=False):
         if (not self.isLoggedIn and not login):
             raise Exception("Not logged in!\n")
-            return;
+            return
 
         self.s.headers.update({'Connection': 'close',
                                'Accept': '*/*',
@@ -620,7 +626,7 @@ class InstagramAPI:
             self.LastJson = json.loads(response.text)
             return True
         else:
-            print ("Request return " + str(response.status_code) + " error!")
+            logger.info("Request return " + str(response.status_code) + " error")
             # for debugging
             try:
                 self.LastResponse = response
