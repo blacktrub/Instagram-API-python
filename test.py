@@ -1,11 +1,36 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+# coding: utf-8
+
+# Before you start: You need to define constants.py file:
+# login = 'login'
+# password = 'password'
+# test_user_id = 0000000
+# test_user_post_id = 0000000
 
 from InstagramAPI import InstagramAPI
+from constants import login, password, test_user_id, test_user_post_id
 
-InstagramAPI = InstagramAPI("login", "password")
-InstagramAPI.login() # login
-InstagramAPI.tagFeed("cat") # get media list by tag #cat
-media_id = InstagramAPI.LastJson # last response JSON
-InstagramAPI.like(media_id["ranked_items"][0]["pk"]) # like first media
-InstagramAPI.getUserFollowers(media_id["ranked_items"][0]["user"]["pk"]) # get first media owner followers
+api = InstagramAPI(login, password)
+api.login()
+
+api.follow(test_user_id)
+api.unfollow(test_user_id)
+
+api.like(test_user_post_id)
+api.unlike(test_user_post_id)
+
+api.getUserFollowers(test_user_id)
+print api.LastJson
+
+api.getUserFollowings(test_user_id)
+print api.LastJson
+
+api.comment(test_user_post_id, 'test comment')
+
+api.getMediaLikers(test_user_post_id)
+print api.LastJso
+
+api.getGeoMedia(test_user_id)
+print api.LastJson
+
+api.uploadPhoto('12345.jpg', caption='test load photo')
+
