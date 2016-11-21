@@ -21,6 +21,7 @@ from settings import LOGGING_SETTINGS
 config.dictConfig(LOGGING_SETTINGS)
 logger = getLogger(__name__)
 
+
 class InstagramAPI:
     API_URL = 'https://i.instagram.com/api/v1/'
     DEVICE_SETTINTS = {
@@ -46,13 +47,14 @@ class InstagramAPI:
     # rank_token          # Rank token
     # IGDataPath          # Data storage path
 
-    def __init__(self, username, password, debug=False, IGDataPath=None):
+    def __init__(self, username, password, proxy=None, debug=False, IGDataPath=None):
         m = hashlib.md5()
         m.update(username.encode('utf-8') + password.encode('utf-8'))
         self.device_id = self.generateDeviceId(m.hexdigest())
         self.setUser(username, password)
         self.isLoggedIn = False
         self.LastResponse = None
+        self.proxy = proxy
 
     def setUser(self, username, password):
         self.username = username
@@ -65,7 +67,8 @@ class InstagramAPI:
             # if you need proxy make something like this:
             # self.s.proxies = {"https" : "http://proxyip:proxyport"}
             if (
-            self.SendRequest('si/fetch_headers/?challenge_type=signup&guid=' + self.generateUUID(False), None, True)):
+                    self.SendRequest('si/fetch_headers/?challenge_type=signup&guid=' + self.generateUUID(False), None,
+                                     True)):
 
                 data = {'phone_id': self.generateUUID(True),
                         '_csrftoken': self.LastResponse.cookies['csrftoken'],
@@ -605,9 +608,9 @@ class InstagramAPI:
         return False
 
     def SendRequest(self, endpoint, post=None, login=False):
-        if (not self.isLoggedIn and not login):
-            raise Exception("Not logged in!\n")
-            return
+        if not self.isLoggedIn and not login:
+            logger.exception('Not logged in')
+            raise Exception("Not logged in!")
 
         self.s.headers.update({'Connection': 'close',
                                'Accept': '*/*',
@@ -616,9 +619,13 @@ class InstagramAPI:
                                'Accept-Language': 'en-US',
                                'User-Agent': self.USER_AGENT})
 
-        if (post != None):  # POST
+        if self.proxy:
+            proxy_string = 'http://%s:%s@%s:%s/' % (self.proxy.login, self.proxy.password, self.proxy.host, self.proxy.port)
+            self.s.proxies = {'http': proxy_string}
+
+        if post:
             response = self.s.post(self.API_URL + endpoint, data=post)  # , verify=False
-        else:  # GET
+        else:
             response = self.s.get(self.API_URL + endpoint)  # , verify=False
 
         if response.status_code == 200:
