@@ -1,5 +1,4 @@
-﻿#!/usr/bin/env python
-# -*- coding: utf-8 -*-
+﻿# coding: utf-8
 import requests
 import random
 import json
@@ -13,6 +12,9 @@ import math
 from ImageUtils import getImageSize
 from requests_toolbelt import MultipartEncoder
 from moviepy.editor import VideoFileClip
+
+from Cookie import SimpleCookie
+from requests.cookies import cookiejar_from_dict
 
 from logging import getLogger
 from logging import config
@@ -47,14 +49,30 @@ class InstagramAPI:
     # rank_token          # Rank token
     # IGDataPath          # Data storage path
 
-    def __init__(self, username, password, proxy=None, debug=False, IGDataPath=None):
+    proxy = None
+    cookie = None
+
+    def __init__(self, username, password, proxy=None, cookie=None, debug=False, IGDataPath=None):
         m = hashlib.md5()
         m.update(username.encode('utf-8') + password.encode('utf-8'))
         self.device_id = self.generateDeviceId(m.hexdigest())
         self.setUser(username, password)
         self.isLoggedIn = False
         self.LastResponse = None
+
         self.proxy = proxy
+        self.cookie = self.cookie_str_to_jar(cookie) if cookie else None
+
+    def cookie_str_to_jar(self, cookie_str):
+        cookie = SimpleCookie()
+        cookie.load(cookie_str)
+
+        cookie_dict = {}
+        for key, morsel in cookie.items():
+            tmp = morsel.OutputString().split('=')
+            cookie_dict[tmp[0]] = tmp[1]
+
+        return cookiejar_from_dict(cookie_dict)
 
     def setUser(self, username, password):
         self.username = username
@@ -62,14 +80,27 @@ class InstagramAPI:
         self.uuid = self.generateUUID(True)
 
     def login(self, force=False):
-        if (not self.isLoggedIn or force):
+        if not self.isLoggedIn or force:
             self.s = requests.Session()
-            # if you need proxy make something like this:
-            # self.s.proxies = {"https" : "http://proxyip:proxyport"}
-            if (
-                    self.SendRequest('si/fetch_headers/?challenge_type=signup&guid=' + self.generateUUID(False), None,
-                                     True)):
 
+            if self.cookie:
+                self.s.cookies = self.cookie
+
+                self.isLoggedIn = True
+                self.username_id = self.cookie['ds_user_id']
+                self.rank_token = "%s_%s" % (self.username_id, self.uuid)
+                self.token = self.cookie['csrftoken']
+
+                self.syncFeatures()
+                self.autoCompleteUserList()
+                self.timelineFeed()
+                self.getv2Inbox()
+                self.getRecentActivity()
+                logger.info("Login with cookies success")
+
+                return True
+
+            if self.SendRequest('si/fetch_headers/?challenge_type=signup&guid=' + self.generateUUID(False), None, True):
                 data = {'phone_id': self.generateUUID(True),
                         '_csrftoken': self.LastResponse.cookies['csrftoken'],
                         'username': self.username,
@@ -78,7 +109,7 @@ class InstagramAPI:
                         'password': self.password,
                         'login_attempt_count': '0'}
 
-                if (self.SendRequest('accounts/login/', self.generateSignature(json.dumps(data)), True)):
+                if self.SendRequest('accounts/login/', self.generateSignature(json.dumps(data)), True):
                     self.isLoggedIn = True
                     self.username_id = self.LastJson["logged_in_user"]["pk"]
                     self.rank_token = "%s_%s" % (self.username_id, self.uuid)
@@ -90,6 +121,11 @@ class InstagramAPI:
                     self.getv2Inbox()
                     self.getRecentActivity()
                     logger.info("Login success")
+
+                    if not self.cookie:
+                        self.cookie = self.s.cookies
+                        logger.info("Save cookies")
+
                     return True
 
     def syncFeatures(self):
